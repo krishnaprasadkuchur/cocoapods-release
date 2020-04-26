@@ -106,9 +106,9 @@ module Pod
 
           repo = @repo || pushed_sources.first
           if repo == "master"
-            execute "pod trunk push #{spec} #{@allow_warnings}"
+            execute "pod trunk push #{spec} #{@allow_warnings} #{@verbose}"
           else
-            execute "pod repo push #{repo} #{spec} #{@allow_warnings}"
+            execute "pod repo push #{repo} #{spec} #{@allow_warnings} #{@verbose}"
           end
         end
       end
