@@ -18,7 +18,6 @@ module Pod
         [
           ['--skip-lint', 'Skip linting'],
           ['--allow-warnings', 'Allows push even if there are lint warnings'],
-          ['--carthage', 'Validates project for carthage deployment'],
           ['--reverse', 'Validates and pushes podspecs in reverse order'],
           ['--verbose', 'Show more debugging information'],
         ].concat(super.reject { |option, _| option == '--silent' })
@@ -28,7 +27,6 @@ module Pod
         warnings = argv.flag?('allow-warnings')
         @allow_warnings = warnings ? "--allow-warnings" : ""
         @repo = argv.shift_argument unless argv.arguments.empty?
-        @carthage = argv.flag?('carthage')
         @reverse = argv.flag?('reverse')
         @verbose = argv.flag?('verbose') ? "--verbose" : ""
         @use_libraries = argv.flag?('use-libraries') ? "--use-libraries" : ""
@@ -99,43 +97,18 @@ module Pod
             execute "pod lib lint #{spec} #{@use_libraries} #{@allow_warnings} --sources=#{available_sources.join(',')}"
           end
 
-          if @carthage
-            execute "carthage build --no-skip-current"
-          end
-
           # Create git tag for current version
           puts "#{"==>".magenta} Tagging repository with version #{"#{version}".green}"
-
-          unless system("git tag | grep -x #{version} > /dev/null")
-            execute "git pull"
-            execute "git tag #{version} -f"
-            execute "git push && git push --tags"
-          end
+          
+          execute "git pull"
+          execute "git tag #{version} -f"
+          execute "git push #{version}"
 
           repo = @repo || pushed_sources.first
           if repo == "master"
             execute "pod trunk push #{spec} #{@allow_warnings}"
           else
             execute "pod repo push #{repo} #{spec} #{@allow_warnings}"
-          end
-
-          if @carthage && `git remote show origin`.include?("github.com")
-            execute "carthage archive #{name}"
-
-            user, repo = /(\w*)\/(\w*).git$/.match(`git remote show origin`)[1, 2]
-            file = "#{name}.framework.zip"
-
-            create_release = %(github-release release --user #{user} --repo #{repo} --tag #{version} --name "Version #{version}" --description "Release of version #{version}")
-            upload_release = %(github-release upload --user #{user} --repo #{repo} --tag #{version} --name "#{file}" --file "#{file}")
-
-            if ENV['GITHUB_TOKEN'] && system("which github-release")
-              execute create_release
-              execute upload_release
-              execute "rm #{file}"
-            else
-              puts "Run `#{create_release} --security-token XXX` to create a github release and"
-              puts "    `#{upload_release} --security-token XXX` to upload to github releases"
-            end
           end
         end
       end
